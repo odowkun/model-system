@@ -2,6 +2,8 @@ import pandas as pd
 import requests
 import pickle
 import io
+from typing import Any
+import numpy as np
 
 def load_data_from_url(url, is_pickle=False):
     response = requests.get(url)
@@ -21,3 +23,13 @@ def load_technicians_df(url):
     except Exception as e:
         raise RuntimeError(f"Error loading technicians.csv: {e}")
     return technicians_df
+
+def replace_nan_with_null(data: Any) -> Any:
+    if isinstance(data, dict):
+        return {key: replace_nan_with_null(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [replace_nan_with_null(item) for item in data]
+    elif isinstance(data, float) and np.isnan(data):
+        return None
+    else:
+        return data

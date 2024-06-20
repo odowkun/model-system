@@ -5,7 +5,7 @@ import tempfile
 import os
 from fastapi import HTTPException
 from dto import ContentRequest, CollaborativeRequest, HybridRequest
-from utils import load_data_from_url, load_model_from_url, load_technicians_df
+from utils import load_data_from_url, load_model_from_url, load_technicians_df, replace_nan_with_null
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -85,6 +85,9 @@ def content_based_filtering(request: ContentRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error predicting score: {e}")
 
+    if np.isnan(predicted_score):
+        predicted_score = 0  # Or any default value you consider appropriate
+
     best_match_score = -1
     best_technician_index = -1
 
@@ -103,7 +106,8 @@ def content_based_filtering(request: ContentRequest):
         best_technician = ori_technician.iloc[best_technician_index]
         # Convert any numpy types to native Python types
         best_technician = best_technician.apply(lambda x: x.item() if isinstance(x, (np.integer, np.floating)) else x)
-        return {"message": best_technician.to_dict()}
+        best_technician = replace_nan_with_null(best_technician.to_dict())
+        return {"message": best_technician}
     else:
         raise HTTPException(status_code=404, detail="No matching technician found.")
 
@@ -122,6 +126,8 @@ def collaborative_filtering(request: CollaborativeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error predicting ratings: {e}")
 
+    predicted_ratings = np.nan_to_num(predicted_ratings)  # Replace NaNs with 0 or other default values
+
     predictions = [(tech_id, pred) for tech_id, pred in zip(technician_id_map.keys(), predicted_ratings.flatten())]
     sorted_predictions = sorted(predictions, key=lambda x: x[1], reverse=True)
 
@@ -130,7 +136,8 @@ def collaborative_filtering(request: CollaborativeRequest):
 
     # Convert any numpy types to native Python types
     top_technician = top_technician.apply(lambda x: x.item() if isinstance(x, (np.integer, np.floating)) else x)
-    return {"message": top_technician.to_dict()}
+    top_technician = replace_nan_with_null(top_technician.to_dict())
+    return {"message": top_technician}
 
 def hybrid_recommendation(request: HybridRequest):
     user_id = request.user_id
